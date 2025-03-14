@@ -15,13 +15,17 @@ Aplikasi ini menampilkan hasil clustering K-Means terhadap data tweet terkait CO
 Anda dapat menentukan jumlah klaster dan melihat hasil pengelompokan secara interaktif.
 """)
 
-# Upload dataset
-uploaded_file = st.file_uploader("Unggah dataset CSV", type=["csv"])
+# Upload dua dataset
+train_file = st.file_uploader("Unggah Dataset Train (CSV)", type=["csv"], key="train")
+test_file = st.file_uploader("Unggah Dataset Test (CSV)", type=["csv"], key="test")
 
-if uploaded_file is not None:
+if train_file is not None and test_file is not None:
     # Load dataset
-    df = pd.read_csv(uploaded_file, encoding='latin1')
-    st.subheader("Preview Dataset")
+    df_train = pd.read_csv(train_file, encoding='latin1')
+    df_test = pd.read_csv(test_file, encoding='latin1')
+    df = pd.concat([df_train, df_test], ignore_index=True)
+
+    st.subheader("Preview Dataset Gabungan")
     st.write(df.head())
 
     # Preprocessing
@@ -78,4 +82,4 @@ if uploaded_file is not None:
     csv = df.to_csv(index=False).encode('utf-8')
     st.download_button("Unduh Hasil Clustering (CSV)", csv, "hasil_clustering.csv", "text/csv")
 else:
-    st.warning("Silakan unggah file dataset CSV terlebih dahulu.")
+    st.warning("Silakan unggah kedua file dataset (Train dan Test) terlebih dahulu.")
