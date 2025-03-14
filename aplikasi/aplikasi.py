@@ -6,17 +6,17 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 from wordcloud import WordCloud
 
-# Judul Aplikasi
+# Judul
 st.title("Aplikasi Clustering Tweet COVID-19 dengan K-Means")
 
-# Deskripsi singkat
 st.markdown("""
-Aplikasi ini menampilkan hasil clustering K-Means terhadap data tweet terkait COVID-19.
-Anda dapat menentukan jumlah klaster dan melihat hasil pengelompokan secara interaktif.
+Aplikasi ini menampilkan hasil clustering K-Means terhadap data tweet COVID-19.
+Anda dapat memilih jumlah klaster dan melihat hasilnya secara interaktif.
 """)
 
+# Fungsi cache
 @st.cache_data
-def load_and_prepare_data():
+def load_data():
     df_train = pd.read_csv("corona_train.csv", encoding='latin1')
     df_test = pd.read_csv("corona_test.csv", encoding='latin1')
     df = pd.concat([df_train, df_test], ignore_index=True)
@@ -26,65 +26,64 @@ def load_and_prepare_data():
     df['OriginalTweet'] = df['OriginalTweet'].astype(str)
     return df
 
-@st.cache_resource
-def vectorize_text(texts):
-    tfidf = TfidfVectorizer(stop_words='english', max_features=500)
-    vectors = tfidf.fit_transform(texts)
-    return tfidf, vectors
+df = load_data()
+
+st.subheader("Preview Data")
+st.dataframe(df.head())
 
 @st.cache_resource
-def apply_kmeans(X, k):
-    model = KMeans(n_clusters=k, random_state=42, n_init='auto')
+def build_vectorizer():
+    vectorizer = TfidfVectorizer(stop_words='english', max_features=500)
+    X = vectorizer.fit_transform(df['OriginalTweet'])
+    return vectorizer, X
+
+vectorizer, X = build_vectorizer()
+
+# Slider klaster
+st.subheader("Pilih Jumlah Klaster")
+k = st.slider("Jumlah Klaster", 2, 6, 3)
+
+@st.cache_resource
+def train_kmeans(k_value):
+    model = KMeans(n_clusters=k_value, random_state=42, n_init='auto')
     model.fit(X)
     return model
 
-# Load & preprocess data
-df = load_and_prepare_data()
-st.subheader("Preview Dataset")
-st.dataframe(df.head())
+model = train_kmeans(k)
 
-# TF-IDF Vectorization
-tfidf, X = vectorize_text(df['OriginalTweet'])
-
-# Pilih jumlah klaster
-st.subheader("Pilih Jumlah Klaster (K)")
-k = st.slider("Jumlah Klaster", 2, 6, 3)
-
-# Clustering
-model = apply_kmeans(X, k)
 df['Cluster'] = model.labels_
 
-# Evaluasi Model
+# Evaluasi
 silhouette = silhouette_score(X, model.labels_)
 inertia = model.inertia_
 
 st.success(f"Silhouette Score: {silhouette:.4f}")
 st.info(f"Inertia (WCSS): {inertia:.2f}")
 
-# WordCloud Tiap Klaster
-st.subheader("Wordcloud Tiap Klaster")
+# Wordcloud
+st.subheader("WordCloud Tiap Klaster")
 for i in range(k):
-    cluster_text = " ".join(df[df['Cluster'] == i]['OriginalTweet'])
-    if cluster_text.strip():
-        wordcloud = WordCloud(width=600, height=300, background_color='white').generate(cluster_text)
+    text = " ".join(df[df['Cluster'] == i]['OriginalTweet'])
+    if text.strip():
+        wc = WordCloud(width=600, height=300, background_color='white').generate(text)
         st.markdown(f"### Klaster {i}")
         fig, ax = plt.subplots()
-        ax.imshow(wordcloud, interpolation='bilinear')
+        ax.imshow(wc, interpolation='bilinear')
         ax.axis('off')
         st.pyplot(fig)
 
-# Tampilkan hasil clustering
+# Tabel hasil
 st.subheader("Hasil Clustering")
 st.dataframe(df[['OriginalTweet', 'Cluster']])
 
-# Fitur interaktif input teks
+# Input tweet interaktif
 st.subheader("Coba Masukkan Tweet Anda")
-user_input = st.text_area("Masukkan tweet di sini:")
+user_input = st.text_area("Masukkan tweet:")
 if st.button("Cari Klaster") and user_input:
-    input_vec = tfidf.transform([user_input])
+    input_vec = vectorizer.transform([user_input])
     pred_cluster = model.predict(input_vec)[0]
     st.success(f"Tweet Anda termasuk dalam Klaster {pred_cluster}")
 
-# Ekspor hasil
+# Unduh hasil
 csv = df.to_csv(index=False).encode('utf-8')
 st.download_button("Unduh Hasil Clustering (CSV)", csv, "hasil_clustering.csv", "text/csv")
